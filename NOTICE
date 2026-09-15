@@ -1,0 +1,17 @@
+ASPIRE
+Copyright 2026 ASPIRE contributors
+
+This product includes modified software developed by the MagicDec contributors
+(https://github.com/Infini-AI-Lab/MagicDec), licensed under Apache-2.0.
+
+This product includes modified software developed by the SparseSpec contributors
+(https://github.com/sspec-project/SparseSpec), licensed under Apache-2.0.
+
+Portions of the model implementation, checkpoint download and conversion
+workflow, weight layout, and tensor-parallel implementation are
+derived from gpt-fast, Copyright Meta Platforms, Inc. and affiliates, licensed
+under BSD-3-Clause. See LICENSES/BSD-3-Clause-gpt-fast.txt.
+
+This distribution builds against FlashInfer, licensed under Apache-2.0. The
+FlashInfer source is not vendored; the exact upstream revision and local patch
+are recorded by the installation tooling.

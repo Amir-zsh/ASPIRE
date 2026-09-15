@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASPIRE: Asynchronous Batched Self-Speculative Decoding for Long-Context LLM Inference</title>
+<meta name="description" content="ASPIRE is a non-synchronized batched self-speculative decoding framework for long-context LLM inference, achieving up to 4.58x decoding throughput over autoregressive baselines.">
+<meta property="og:title" content="ASPIRE: Asynchronous Batched Self-Speculative Decoding">
+<meta property="og:description" content="Per-request speculation inside one batched forward pass: up to 4.58x decoding throughput for long-context LLM inference, losslessly.">
+<meta property="og:image" content="assets/method.png">
+<link rel="icon" type="image/png" href="assets/logo.png">
+<style>
+  :root {
+    --indigo: #3F4693;
+    --violet: #6A5ACD;
+    --ink: #22263B;
+    --muted: #5A6172;
+    --bg: #EDF0F6;
+    --cardline: #DCE0EC;
+    --soft-blue: #E8EEFB;
+    --soft-violet: #ECEAFB;
+    --soft-green: #E3F3EC;
+    --soft-gold: #FFF3C4;
+    --soft-red: #FDEAE7;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+  .card {
+    background: #fff;
+    border: 1px solid var(--cardline);
+    border-radius: 16px;
+    padding: 32px 36px;
+    margin: 22px 0;
+  }
+
+  /* Hero */
+  .hero { text-align: center; padding-top: 40px; }
+  .hero img.logo { height: 72px; vertical-align: middle; }
+  .hero h1 {
+    font-size: clamp(26px, 4vw, 40px);
+    line-height: 1.25;
+    margin: 14px 0 6px;
+  }
+  .hero h1 .brand { color: var(--indigo); }
+  .authors { font-size: 18px; margin: 14px 0 2px; }
+  .authors a { color: var(--ink); text-decoration: none; }
+  .affil { color: var(--muted); font-size: 16px; margin-bottom: 4px; }
+  .venue { color: var(--muted); font-size: 15px; font-style: italic; }
+  .btns { margin: 22px 0 8px; }
+  .btn {
+    display: inline-block;
+    background: var(--indigo);
+    color: #fff;
+    border-radius: 999px;
+    padding: 9px 22px;
+    margin: 4px 6px;
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background .15s;
+  }
+  .btn:hover { background: var(--violet); }
+  .btn.disabled { background: #A9AECB; cursor: default; }
+
+  /* Sections */
+  h2 {
+    color: var(--indigo);
+    font-size: 26px;
+    margin: 0 0 14px;
+    border-bottom: 3px solid var(--soft-violet);
+    padding-bottom: 8px;
+  }
+  h3 { font-size: 19px; margin: 18px 0 6px; }
+  p { margin: 10px 0; }
+  .muted { color: var(--muted); }
+  figure { margin: 18px 0; text-align: center; }
+  figure img { max-width: 100%; height: auto; }
+  figcaption { color: var(--muted); font-size: 14.5px; margin-top: 10px; text-align: left; }
+  figcaption b { color: var(--ink); }
+
+  /* Stat cards */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0 4px; }
+  .stat { border-radius: 12px; padding: 18px 16px; text-align: center; }
+  .stat .big { font-size: clamp(28px, 4vw, 44px); font-weight: 800; color: var(--indigo); }
+  .stat .lbl { font-size: 14px; color: var(--muted); margin-top: 6px; }
+
+  /* Observation / component grids */
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 14px; }
+  .cell { background: var(--soft-blue); border-radius: 12px; padding: 14px 16px; font-size: 15px; }
+  .cell b { color: var(--indigo); }
+  .callout { border-radius: 12px; padding: 14px 18px; margin: 14px 0; font-size: 15.5px; }
+
+  /* Table */
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; margin-top: 10px; }
+  th, td { padding: 8px 12px; text-align: center; }
+  thead th { background: var(--indigo); color: #fff; }
+  tbody tr:nth-child(even) { background: var(--soft-blue); }
+  tbody td:first-child { text-align: left; font-weight: 600; }
+  td.best { font-weight: 800; color: var(--indigo); }
+
+  /* BibTeX */
+  pre {
+    background: #F4F5FA;
+    border: 1px solid var(--cardline);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+
+  footer { text-align: center; color: var(--muted); font-size: 14px; padding: 18px 0 34px; }
+
+  @media (max-width: 760px) {
+    .stats, .grid3 { grid-template-columns: 1fr; }
+    .card { padding: 22px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ============================ Hero ============================ -->
+  <div class="card hero">
+    <img class="logo" src="assets/logo.png" alt="ASPIRE logo">
+    <h1><span class="brand">ASPIRE:</span> Asynchronous Batched Self-Speculative<br>
+        Decoding for Long-Context LLM Inference</h1>
+    <div class="authors">
+      Amir Ziashahabi<sup>*</sup>, &nbsp;Hossein Entezari Zarch<sup>*</sup>, &nbsp;Lei Gao, &nbsp;Murali Annavaram, &nbsp;Salman Avestimehr
+    </div>
+    <div class="affil">University of Southern California &nbsp;&middot;&nbsp; <sup>*</sup>Equal contribution</div>
+    <div class="venue"><b style="color:var(--indigo); font-style:normal">COLM 2026</b>
+      (Conference on Language Modeling)</div>
+    <div style="margin-top:14px; display:flex; justify-content:center; align-items:center; gap:28px;">
+      <img src="assets/colm_logo.svg" alt="COLM" style="height:46px">
+      <img src="assets/usc_logo.png" alt="University of Southern California" style="height:38px">
+    </div>
+    <div class="btns">
+      <a class="btn" href="https://arxiv.org/abs/XXXX.XXXXX">&#128196; Paper (arXiv)</a>
+      <a class="btn" href="https://github.com/Amir-zsh/ASPIRE">&#128187; Code</a>
+    </div>
+    <div class="stats">
+      <div class="stat" style="background:var(--soft-violet)">
+        <div class="big">Per-request</div>
+        <div class="lbl">each request picks its own draft length and verification point inside one batched forward pass</div>
+      </div>
+      <div class="stat" style="background:var(--soft-blue)">
+        <div class="big">2.1&ndash;3.3&times;</div>
+        <div class="lbl">average speedup per model across all five workloads; best on every model</div>
+      </div>
+      <div class="stat" style="background:var(--soft-green)">
+        <div class="big">Lossless</div>
+        <div class="lbl">verification accepts only tokens consistent with full attention, preserving the model's output distribution</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ Abstract ============================ -->
+  <div class="card">
+    <h2>Abstract</h2>
+    <p>Long-context LLM inference, increasingly common in agentic and reasoning workloads, is
+    bottlenecked by attention: repeated KV-cache reads make decoding memory-bound.
+    Self-speculative decoding alleviates this by drafting tokens with sparse attention and
+    verifying them with full attention, but existing batched methods remain
+    <em>synchronized</em>: all requests in a batch share a single draft-verify schedule, even
+    though the optimal draft length varies widely across requests and changes dynamically within
+    each request. We propose <b>ASPIRE</b>, a non-synchronized batched self-speculative decoding
+    framework built on three components. First, a <em>unified mixed forward</em> allows drafting
+    and verifying requests to coexist in the same batched forward pass, removing the need for
+    global draft-verify phases. Second, a lightweight <em>online speculation scheduler</em> uses
+    per-request acceptance-rate estimates and a batch-aware cost model to let each request
+    independently choose when to verify. Third, an <em>intra-draft refresh layer</em> performs
+    full attention at a single designated layer during drafting, updating the sparse context at
+    every draft step so that it does not become stale. Across three models and five reasoning and
+    long-context benchmarks, ASPIRE achieves 1.70&ndash;4.58&times; decoding throughput over
+    autoregressive baselines and consistently outperforms prior self-speculative methods.</p>
+  </div>
+
+  <!-- ============================ Motivation ============================ -->
+  <div class="card">
+    <h2>Why Non-Synchronized Speculation?</h2>
+    <p>In long-context decoding, every new token re-reads the request's full KV cache. Batching
+    amortizes model weights in the MLP, but attention still reads each request's private cache,
+    so decoding stays memory-bound as contexts grow. Self-speculative decoding helps by pairing
+    cheap sparse-attention drafting with exact full-attention verification, reading the full
+    cache once per verified block instead of once per token.</p>
+    <div class="callout" style="background:var(--soft-red)">
+      <b>The catch:</b> existing batched systems (MagicDec, SpecAttn) are <b>synchronized</b>.
+      All requests draft and verify in lockstep under one shared schedule, so some are
+      under-drafted while others are over-drafted.
+    </div>
+    <figure>
+      <img src="assets/mob.png" alt="Motivating observations">
+    </figure>
+    <div class="grid3">
+      <div class="cell"><b>(a) Optimal draft length is request-dependent.</b> The average accepted
+      draft length varies widely from one LongBench request to the next.</div>
+      <div class="cell"><b>(b) &hellip;and drifts within each request.</b> Accepted length
+      fluctuates across verification rounds, so no fixed schedule can track it.</div>
+      <div class="cell"><b>(c) Cross-layer signals stay fresh.</b> An earlier layer of the same
+      token predicts the sparse context far better than attention maps reused from earlier
+      tokens.</div>
+    </div>
+  </div>
+
+  <!-- ============================ Method ============================ -->
+  <div class="card">
+    <h2>ASPIRE: Per-Request Speculation Inside One Batched Forward Pass</h2>
+    <figure>
+      <img src="assets/method.png" alt="ASPIRE overview">
+      <figcaption><b>Overview of ASPIRE.</b> The speculation scheduler (left) estimates a
+      per-request acceptance rate &alpha;<sub>i</sub> and cost ratio c<sub>i</sub> to compute a
+      target draft length &gamma;<sub>i</sub>, deciding whether each request drafts or verifies
+      at each step. The unified mixed forward (middle) executes drafting requests (sparse
+      attention over selected KV pages) and verifying requests (full attention over the entire
+      cache) together in a single batched pass. At a designated refresh layer (right), drafting
+      requests perform full attention and re-select the top-scoring context pages, updating the
+      sparse context for subsequent layers and the next draft step.</figcaption>
+    </figure>
+    <div class="grid3">
+      <div class="cell" style="background:var(--soft-violet)">
+        <b>1. Unified mixed forward.</b> Drafting and verifying requests share one batched pass.
+        A <b>drafting</b> request uses <b>sparse attention</b>, reading only its selected KV
+        pages instead of the full cache. A <b>verifying</b> request uses <b>full attention</b>
+        over its entire KV cache to check all drafted tokens at once, exactly, so outputs match
+        autoregressive decoding. MLP GEMMs stay shared across the whole batch.
+      </div>
+      <div class="cell" style="background:var(--soft-blue)">
+        <b>2. Batch-aware speculation scheduler.</b> Decides, per request, when to switch modes:
+        keep drafting cheap sparse-attention tokens, or pay one full-attention pass to verify
+        them. Each request tracks a smoothed acceptance rate &alpha;<sub>i</sub> and a
+        draft-to-verify cost ratio c<sub>i</sub>, and verifies once its draft length
+        d<sub>i</sub> reaches its own target &gamma;<sub>i</sub> that maximizes expected
+        committed tokens per unit time.
+      </div>
+      <div class="cell" style="background:var(--soft-green)">
+        <b>3. Intra-draft context refresh.</b> The one exception while drafting: all layers use
+        sparse attention <b>except</b> a designated refresh layer &ell;<sub>r</sub>, which runs
+        <b>full attention</b>. Its attention scores re-select the top-scoring KV pages after
+        every draft step, so the sparse context follows generation instead of going stale.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ Results ============================ -->
+  <div class="card">
+    <h2>Results</h2>
+    <p>We evaluate on Qwen3-1.7B, Qwen3-8B, and DeepSeek-R1-Distill-Llama-8B across five
+    workloads: AIME25 and CodeElo (short-context reasoning), LongBench [16k&ndash;18k], and
+    LongBench-v2 [30k&ndash;40k] and [80k&ndash;100k] (long context). All experiments run on a
+    single NVIDIA H100 NVL (94&thinsp;GB) with paged KV (page size 16), sparsity &rho;=7%,
+    k<sub>min</sub>=32 pages, L=8 recent pages, and the refresh layer at the second-to-last
+    transformer layer. We report decode-only throughput at the largest batch that fits.</p>
+    <h3>Short-context reasoning (AIME25, CodeElo)</h3>
+    <figure><img src="assets/exp1.png" alt="Reasoning throughput"></figure>
+    <h3>Long context (LongBench, LongBench-v2): gains grow with context</h3>
+    <figure><img src="assets/exp2.png" alt="Long-context throughput"></figure>
+    <h3>Overall speedup over autoregressive decoding</h3>
+    <p class="muted">Averaged across all five workloads (Table 1 of the paper). ASPIRE-Fixed and
+    ASPIRE-FSM are ablations: ASPIRE-Fixed keeps only the refresh layer under synchronized
+    batching with a fixed draft length; ASPIRE-FSM replaces the scheduler with a simple feedback
+    rule.</p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Model</th><th>MagicDec</th><th>SpecAttn</th><th>ASPIRE-FSM</th><th>ASPIRE-Fixed</th><th>ASPIRE</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Qwen3-1.7B</td><td>2.62&times;</td><td>2.62&times;</td><td>3.26&times;</td><td>2.74&times;</td><td class="best">3.34&times;</td></tr>
+          <tr><td>Qwen3-8B</td><td>1.51&times;</td><td>1.63&times;</td><td>1.94&times;</td><td>1.78&times;</td><td class="best">2.08&times;</td></tr>
+          <tr><td>DS-Llama-8B</td><td>1.57&times;</td><td>1.69&times;</td><td>1.93&times;</td><td>1.80&times;</td><td class="best">2.14&times;</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============================ Ablations ============================ -->
+  <div class="card">
+    <h2>Ablations: Intra-Draft Refresh and Its Placement</h2>
+    <div class="grid3" style="grid-template-columns: 1.1fr 1fr 1fr; align-items: start;">
+      <div>
+        <p><b>Without intra-draft refresh</b>, acceptance collapses as drafts lengthen: 60.3%
+        vs.&nbsp;<b>76.6%</b> at draft length &gamma;=10, a <b>16.4&thinsp;pp</b> gap
+        (Qwen3-8B, LongBench [16k&ndash;18k]).</p>
+        <p><b>Placement:</b> acceptance plateaus from layer 8 onward; the second-to-last layer
+        (N&minus;2) is best (88.2%, 1.63&times; over autoregressive on AIME). The last layer
+        drops sharply: its attention specializes for next-token prediction.</p>
+      </div>
+      <figure style="margin:0"><img src="assets/abl_draft.png" alt="Acceptance vs draft length">
+        <figcaption style="text-align:center">Acceptance vs. draft length</figcaption></figure>
+      <figure style="margin:0"><img src="assets/abl_layer.png" alt="Refresh layer sweep" style="max-height:340px">
+        <figcaption style="text-align:center">Refresh-layer sweep (AIME)</figcaption></figure>
+    </div>
+  </div>
+
+  <!-- ============================ BibTeX ============================ -->
+  <div class="card">
+    <h2>Citation</h2>
+    <p>If you find ASPIRE useful or relevant to your project and research, please kindly cite our paper:</p>
+    <pre>@article{ziashahabi2026aspire,
+  title={ASPIRE: Asynchronous Batched Self-Speculative Decoding for Long-Context LLM Inference},
+  author={Ziashahabi, Amir and Entezari Zarch, Hossein and Gao, Lei and Annavaram, Murali and Avestimehr, Salman},
+  journal={arXiv preprint arXiv:XXXX.XXXXX},
+  year={2026}
+}</pre>
+  </div>
+
+  <footer>
+    ASPIRE &middot; University of Southern California &middot; 2026
+  </footer>
+
+</div>
+
+</body>
+</html>
