@@ -1,7 +1,7 @@
 # ASPIRE
 
 Source code for reproducing results from **ASPIRE: Asynchronous Batched Self-Speculative Decoding for
-Long-Context LLM Inference**. See the [project page](https://amir-zsh.github.io/ASPIRE/).
+Long-Context LLM Inference**. See the [paper](https://arxiv.org/abs/2609.17943) and the [project page](https://amir-zsh.github.io/ASPIRE/).
 
 ASPIRE speeds up batched long-context decoding with self-speculation. Unlike
 prior batched methods, requests are not synchronized: each one drafts and
@@ -204,7 +204,7 @@ checkpoint conversion, tensor parallelism), BSD 3-Clause. See `NOTICE` and
 @article{ziashahabi2026aspire,
   title={ASPIRE: Asynchronous Batched Self-Speculative Decoding for Long-Context LLM Inference},
   author={Ziashahabi, Amir and Entezari Zarch, Hossein and Gao, Lei and Annavaram, Murali and Avestimehr, Salman},
-  journal={arXiv preprint arXiv:XXXX.XXXXX},
+  journal={arXiv preprint arXiv:2609.17943},
   year={2026}
 }
 ```
